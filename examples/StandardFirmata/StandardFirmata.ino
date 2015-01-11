@@ -41,6 +41,18 @@
 #define I2C_READ_WRITE_MODE_MASK B00011000
 #define I2C_10BIT_ADDRESS_MODE_MASK B00100000
 
+// command values for pin group
+#define PIN_GROUP_DATA          0x60 // request or control a group of pins
+
+#define PG_CONFIG               0x00
+#define PG_CLEAR                0x01
+#define PG_PIN_STATE_SET        0x02
+#define PG_PIN_STATE_REQUEST    0x03
+#define PG_PIN_STATE_REPLY      0x04
+// future reserved     (0x05 - 0x07)
+
+#define MAX_PIN_GROUPS 8
+
 #define MAX_QUERIES 8
 #define MINIMUM_SAMPLING_INTERVAL 10
 
@@ -88,6 +100,8 @@ byte detachedServos[MAX_SERVOS];
 byte detachedServoCount = 0;
 byte servoCount = 0;
 
+// TODO: Change this to array of pointers to actual pin maps.
+byte pinGroupPins[8];
 
 /*==============================================================================
  * FUNCTIONS
@@ -576,6 +590,49 @@ void sysexCallback(byte command, byte argc, byte *argv)
       }
       Firmata.write(END_SYSEX);
       break;
+    case PIN_GROUP_DATA:
+     
+        Serial1.println("Pin group data"); 
+        byte pinGroupID = argv[0] >> 4;
+        byte pinGroupCommand = argv[0] & 0x07; // grab bottom three bits for command
+
+        Serial1.print("Number of message bytes?: ");
+        Serial1.println(argc);
+      // TODO: Fill in the various messages
+      switch (pinGroupCommand) {
+        case PG_CONFIG: {
+          // set up the pin group
+          bool pinGroupMode = argv[1] & 0x01; // grab pinMode off the lowest bit in second message.
+          uint8_t msgOffset = 2;
+          for (uint8_t i=msgOffset; i < argc; i++) {
+            // we now get the actual pin map that has been set.
+            // TODO: Make this work on a multi dimensional array using the ID
+            pinGroupPins[i-msgOffset] = argv[i];
+            Serial1.println(argv[i]);
+            pinMode(argv[i], pinGroupMode);
+          }
+          break;
+        }
+        case PG_CLEAR: {
+          // reset the membership of the pin group.
+          break;
+        }
+        case PG_PIN_STATE_SET: {
+          // set the state of the pins in the group
+          uint8_t lowBits = argv[2];
+          break;
+        }
+        case PG_PIN_STATE_REQUEST: {
+          // get the state of the pin group and return it.
+
+          Firmata.write(START_SYSEX);
+          // fill in the reply details here.
+          Firmata.write(END_SYSEX);
+          break;
+        }
+
+      }
+      
   }
 }
 
@@ -666,6 +723,10 @@ void setup()
 
   Firmata.begin(57600);
   systemResetCallback();  // reset to default config
+
+    Serial1.begin(9600);
+    Serial1.println("Debugging stuff");
+
 }
 
 /*==============================================================================
