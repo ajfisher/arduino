@@ -101,7 +101,8 @@ byte detachedServoCount = 0;
 byte servoCount = 0;
 
 // TODO: Change this to array of pointers to actual pin maps.
-byte pinGroupPins[8];
+byte pinGroupPins[14];
+byte pinGroupLength;
 
 /*==============================================================================
  * FUNCTIONS
@@ -592,24 +593,22 @@ void sysexCallback(byte command, byte argc, byte *argv)
       break;
     case PIN_GROUP_DATA:
      
-        Serial1.println("Pin group data"); 
         byte pinGroupID = argv[0] >> 4;
         byte pinGroupCommand = argv[0] & 0x07; // grab bottom three bits for command
 
-        Serial1.print("Number of message bytes?: ");
-        Serial1.println(argc);
+
       // TODO: Fill in the various messages
       switch (pinGroupCommand) {
         case PG_CONFIG: {
           // set up the pin group
           bool pinGroupMode = argv[1] & 0x01; // grab pinMode off the lowest bit in second message.
           uint8_t msgOffset = 2;
+          pinGroupLength = 0;
           for (uint8_t i=msgOffset; i < argc; i++) {
             // we now get the actual pin map that has been set.
             // TODO: Make this work on a multi dimensional array using the ID
             pinGroupPins[i-msgOffset] = argv[i];
-            Serial1.println(argv[i]);
-            pinMode(argv[i], pinGroupMode);
+            pinGroupLength++;
           }
           break;
         }
@@ -619,7 +618,22 @@ void sysexCallback(byte command, byte argc, byte *argv)
         }
         case PG_PIN_STATE_SET: {
           // set the state of the pins in the group
-          uint8_t lowBits = argv[2];
+         
+          // TODO: Do this by group ID.
+ 
+          // go through pins in group and set appropriate pin states
+          for (uint8_t i = 0; i< pinGroupLength; i++) {
+            
+            byte pinStates = argv[1];
+            byte pinMaskPos = i;
+            if (i >= 7) {
+                pinStates = argv[2]; // move to second byte when needed.
+                pinMaskPos = i % 7;
+            }
+
+            digitalWrite(pinGroupPins[i], (pinStates & (1 << pinMaskPos)));
+          }
+
           break;
         }
         case PG_PIN_STATE_REQUEST: {
